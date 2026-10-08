@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fishing Leaderboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #leaderboard-container {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            width: 400px;
+            height: 600px;
+            background-image: url('leaderboard-bg.png'); 
+            background-size: cover;
+            background-position: center;
+            border-radius: 16px;
+            padding: 30px;
+            box-sizing: border-box;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+            color: #ffffff;
+            
+            /* Hidden by default */
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            pointer-events: none;
+        }
+
+        /* Class to show the leaderboard smoothly */
+        #leaderboard-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #00d2ff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+            font-size: 26px;
+        }
+
+        ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        li {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .score {
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="leaderboard-container" id="leaderboard-box">
+        <h2>🐟 Top 10 Anglers 🐟</h2>
+        <ol id="leaderboard-list">
+            <!-- Dynamically injected -->
+        </ol>
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://127.0.0.1:8080/");
+        let hideTimeout;
+
+        ws.onopen = () => {
+            console.log("Leaderboard connected to Streamer.bot WebSocket!");
+            ws.send(JSON.stringify({
+                "request": "Subscribe",
+                "events": { 
+                    "Custom": ["*"],
+                    "General": ["*"]
+                },
+                "id": "LeaderboardOverlay"
+            }));
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const rawData = JSON.parse(event.data);
+                const payload = rawData.data || rawData;
+
+                if (payload.type === 'LeaderboardUpdate' && payload.leaders) {
+                    const container = document.getElementById('leaderboard-container');
+                    const listElement = document.getElementById('leaderboard-list');
+                    listElement.innerHTML = ''; 
+
+                    payload.leaders.forEach((player, index) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<span>${index + 1}. ${player.name}</span> <span class="score">${player.score} pts</span>`;
+                        listElement.appendChild(li);
+                    });
+
+                    // Clear any existing close timer so it doesn't cut off early
+                    clearTimeout(hideTimeout);
+
+                    // Fade in the leaderboard container
+                    container.classList.add('visible');
+
+                    // Automatically hide after 9 seconds (falls right into your 8-10s window)
+                    hideTimeout = setTimeout(() => {
+                        container.classList.remove('visible');
+                    }, 9000);
+                }
+            } catch (err) {
+                console.error("Error parsing leaderboard data:", err);
+            }
+        };
+    </script>
+</body>
+</html>
